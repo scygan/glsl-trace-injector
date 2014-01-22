@@ -168,13 +168,13 @@ struct glslopt_shader
 
 static inline void debug_print_ir (const char* name, exec_list* ir, _mesa_glsl_parse_state* state, void* memctx)
 {
-	#if 0
+//	#if 0
 	printf("**** %s:\n", name);
 	//_mesa_print_ir (ir, state);
 	char* foobar = _mesa_print_ir_glsl(ir, state, ralloc_strdup(memctx, ""), kPrintGlslFragment);
 	printf("%s\n", foobar);
 	validate_ir_tree(ir);
-	#endif
+//	#endif
 }
 
 static void propagate_precision_deref(ir_instruction *ir, void *data)
@@ -364,6 +364,117 @@ static void find_shader_inputs(glslopt_shader* sh, exec_list* ir)
 	}
 }
 
+void glslopt_addtracepoints(struct _mesa_glsl_parse_state *state)
+{
+    printf("glslopt_addtracepoints - begin\n");
+    foreach_list_typed (ast_node, ast, link, & state->translation_unit)
+    {
+        ast->trace(state);
+    }
+    printf("glslopt_addtracepoints - end\n");
+}
+
+glslopt_shader* glslopt_trace (glslopt_ctx* ctx, glslopt_shader_type type, const char* shaderSource, unsigned options)
+{
+    glslopt_shader* shader = new (ctx->mem_ctx) glslopt_shader ();
+
+    PrintGlslMode printMode = kPrintGlslVertex;
+    switch (type) {
+    case kGlslOptShaderVertex: shader->shader->Type = GL_VERTEX_SHADER; printMode = kPrintGlslVertex; break;
+    case kGlslOptShaderFragment: shader->shader->Type = GL_FRAGMENT_SHADER; printMode = kPrintGlslFragment; break;
+    }
+    if (!shader->shader->Type)
+    {
+        shader->infoLog = ralloc_asprintf (shader, "Unknown shader type %d", (int)type);
+        shader->status = false;
+        return shader;
+    }
+
+    _mesa_glsl_parse_state* state = new (shader) _mesa_glsl_parse_state (&ctx->mesa_ctx, shader->shader->Type, shader);
+    state->error = 0;
+
+    if (!(options & kGlslOptionSkipPreprocessor))
+    {
+        state->error = !!glcpp_preprocess (state, &shaderSource, &state->info_log, state->extensions, &ctx->mesa_ctx);
+        if (state->error)
+        {
+            shader->status = !state->error;
+            shader->infoLog = state->info_log;
+            return shader;
+        }
+    }
+
+    _mesa_glsl_lexer_ctor (state, shaderSource);
+    _mesa_glsl_parse (state);
+    _mesa_glsl_lexer_dtor (state);
+
+    if (!state->error && !state->translation_unit.is_empty())
+        glslopt_addtracepoints(state);
+
+    exec_list* ir = new (shader) exec_list();
+    shader->shader->ir = ir;
+
+    if (!state->error && !state->translation_unit.is_empty())
+        _mesa_ast_to_hir (ir, state);
+
+    // Un-optimized output
+    if (!state->error) {
+        validate_ir_tree(ir);
+        shader->rawOutput = _mesa_print_ir_glsl(ir, state, ralloc_strdup(shader, ""), printMode);
+    }
+
+    // Link built-in functions
+    shader->shader->symbols = state->symbols;
+    memcpy(shader->shader->builtins_to_link, state->builtins_to_link, sizeof(shader->shader->builtins_to_link[0]) * state->num_builtins_to_link);
+    shader->shader->num_builtins_to_link = state->num_builtins_to_link;
+
+    struct gl_shader* linked_shader = NULL;
+
+    if (!state->error && !ir->is_empty())
+    {
+        linked_shader = link_intrastage_shaders(shader,
+            &ctx->mesa_ctx,
+            shader->whole_program,
+            shader->whole_program->Shaders,
+            shader->whole_program->NumShaders);
+        if (!linked_shader)
+        {
+            shader->status = false;
+            shader->infoLog = shader->whole_program->InfoLog;
+            return shader;
+        }
+        ir = linked_shader->ir;
+
+        debug_print_ir ("==== After link ====", ir, state, shader);
+    }
+
+    // Do optimization post-link
+    if (!state->error && !ir->is_empty())
+    {		
+        const bool linked = !(options & kGlslOptionNotFullShader);
+        do_optimization_passes(ir, linked, state, shader);
+        validate_ir_tree(ir);
+    }	
+
+    // Final optimized output
+    if (!state->error)
+    {
+        shader->optimizedOutput = _mesa_print_ir_glsl(ir, state, ralloc_strdup(shader, ""), printMode);
+    }
+
+    shader->status = !state->error;
+    shader->infoLog = state->info_log;
+
+    find_shader_inputs(shader, ir);
+
+    ralloc_free (ir);
+    ralloc_free (state);
+
+    if (linked_shader)
+        ralloc_free(linked_shader);
+
+    return shader;
+}
 
 glslopt_shader* glslopt_optimize (glslopt_ctx* ctx, glslopt_shader_type type, const char* shaderSource, unsigned options)
 {
@@ -399,7 +510,7 @@ glslopt_shader* glslopt_optimize (glslopt_ctx* ctx, glslopt_shader_type type, co
 	_mesa_glsl_parse (state);
 	_mesa_glsl_lexer_dtor (state);
 
-	exec_list* ir = new (shader) exec_list();
+    exec_list* ir = new (shader) exec_list();
 	shader->shader->ir = ir;
 
 	if (!state->error && !state->translation_unit.is_empty())
