@@ -1123,6 +1123,25 @@ public:
    unsigned write_mask:4;
 };
 
+class ir_tracepoint: public ir_instruction {
+public:
+   ir_tracepoint(ir_rvalue *_var):var(_var) {}
+
+   virtual ir_tracepoint *clone(void *mem_ctx, struct hash_table *ht) const;
+
+   virtual void accept(ir_visitor *v) {
+       v->visit(this);
+   }
+
+   virtual ir_visitor_status accept(ir_hierarchical_visitor *v) {
+       return v->visit(this);
+   }
+
+   ir_rvalue *var;
+
+};
+
+
 /* Update ir_expression::get_num_operands() and operator_strs when
  * updating this list.
  */

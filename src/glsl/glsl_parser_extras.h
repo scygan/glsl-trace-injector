@@ -298,6 +298,13 @@ struct _mesa_glsl_parse_state {
    char *info_log;
 
    /**
+    * Shader tracing enabled?
+    *
+    * When this is true, additional trace code is compiled into the shader
+    */
+   bool trace;
+
+   /**
     * \name Enable bits for GLSL extensions
     */
    /*@{*/

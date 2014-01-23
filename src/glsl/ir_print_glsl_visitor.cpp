@@ -184,6 +184,7 @@ public:
 	virtual void visit(ir_typedecl_statement *);
 	virtual void visit(ir_emit_vertex *);
 	virtual void visit(ir_end_primitive *);
+    virtual void visit(ir_tracepoint *);
 	
 	void emit_assignment_part (ir_dereference* lhs, ir_rvalue* rhs, unsigned write_mask, ir_rvalue* dstIndex);
 	bool emit_canonical_for (ir_loop* ir);
@@ -1540,3 +1541,12 @@ ir_print_glsl_visitor::visit(ir_end_primitive *ir)
 {
 	buffer.asprintf_append ("end-primitive-TODO");
 }
+
+void
+ir_print_glsl_visitor::visit(ir_tracepoint *ir)
+{
+    buffer.asprintf_append ("//tracepoint(");
+    ir->var->accept(this);
+    buffer.asprintf_append (")");
+}
+

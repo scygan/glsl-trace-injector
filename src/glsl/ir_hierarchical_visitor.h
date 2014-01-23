@@ -91,6 +91,7 @@ public:
    virtual ir_visitor_status visit(class ir_typedecl_statement *);
    virtual ir_visitor_status visit(class ir_emit_vertex *);
    virtual ir_visitor_status visit(class ir_end_primitive *);
+   virtual ir_visitor_status visit(class ir_tracepoint*);
 
    /**
     * ir_dereference_variable isn't technically a leaf, but it is treated as a

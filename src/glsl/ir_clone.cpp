@@ -290,6 +290,12 @@ ir_assignment::clone(void *mem_ctx, struct hash_table *ht) const
 				     this->write_mask);
 }
 
+ir_tracepoint *
+ir_tracepoint::clone(void *mem_ctx, struct hash_table *ht) const
+{
+    return new(mem_ctx) ir_tracepoint(var->clone(mem_ctx, ht));
+}
+
 ir_function *
 ir_function::clone(void *mem_ctx, struct hash_table *ht) const
 {

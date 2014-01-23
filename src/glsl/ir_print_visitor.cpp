@@ -551,3 +551,11 @@ ir_print_visitor::visit(ir_end_primitive *ir)
 {
    printf("(end-primitive)");
 }
+
+void
+ir_print_visitor::visit(ir_tracepoint *ir)
+{
+    printf("(tracepoint ");
+    ir->var->accept(this);
+    printf(")");
+}

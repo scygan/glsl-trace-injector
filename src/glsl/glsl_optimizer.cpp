@@ -364,16 +364,6 @@ static void find_shader_inputs(glslopt_shader* sh, exec_list* ir)
 	}
 }
 
-void glslopt_addtracepoints(struct _mesa_glsl_parse_state *state)
-{
-    printf("glslopt_addtracepoints - begin\n");
-    foreach_list_typed (ast_node, ast, link, & state->translation_unit)
-    {
-        ast->trace(state);
-    }
-    printf("glslopt_addtracepoints - end\n");
-}
-
 glslopt_shader* glslopt_trace (glslopt_ctx* ctx, glslopt_shader_type type, const char* shaderSource, unsigned options)
 {
     glslopt_shader* shader = new (ctx->mem_ctx) glslopt_shader ();
@@ -393,6 +383,8 @@ glslopt_shader* glslopt_trace (glslopt_ctx* ctx, glslopt_shader_type type, const
     _mesa_glsl_parse_state* state = new (shader) _mesa_glsl_parse_state (&ctx->mesa_ctx, shader->shader->Type, shader);
     state->error = 0;
 
+    state->trace = true;
+
     if (!(options & kGlslOptionSkipPreprocessor))
     {
         state->error = !!glcpp_preprocess (state, &shaderSource, &state->info_log, state->extensions, &ctx->mesa_ctx);
@@ -408,9 +400,6 @@ glslopt_shader* glslopt_trace (glslopt_ctx* ctx, glslopt_shader_type type, const
     _mesa_glsl_parse (state);
     _mesa_glsl_lexer_dtor (state);
 
-    if (!state->error && !state->translation_unit.is_empty())
-        glslopt_addtracepoints(state);
-
     exec_list* ir = new (shader) exec_list();
     shader->shader->ir = ir;
 
@@ -425,8 +414,7 @@ glslopt_shader* glslopt_trace (glslopt_ctx* ctx, glslopt_shader_type type, const
 
     // Link built-in functions
     shader->shader->symbols = state->symbols;
-    memcpy(shader->shader->builtins_to_link, state->builtins_to_link, sizeof(shader->shader->builtins_to_link[0]) * state->num_builtins_to_link);
-    shader->shader->num_builtins_to_link = state->num_builtins_to_link;
+    shader->shader->uses_builtin_functions = state->uses_builtin_functions;
 
     struct gl_shader* linked_shader = NULL;
 
@@ -466,6 +454,8 @@ glslopt_shader* glslopt_trace (glslopt_ctx* ctx, glslopt_shader_type type, const
     shader->infoLog = state->info_log;
 
     find_shader_inputs(shader, ir);
+    if (!state->error)
+        calculate_shader_stats (ir, &shader->statsMath, &shader->statsTex, &shader->statsFlow);
 
     ralloc_free (ir);
     ralloc_free (state);

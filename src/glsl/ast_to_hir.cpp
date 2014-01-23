@@ -877,8 +877,11 @@ do_assignment(exec_list *instructions, struct _mesa_glsl_parse_state *state,
    instructions->push_tail(new(ctx) ir_assignment(deref_var, rhs));
    deref_var = new(ctx) ir_dereference_variable(var);
 
-   if (!error_emitted)
+   if (!error_emitted) { 
       instructions->push_tail(new(ctx) ir_assignment(lhs, deref_var));
+
+      instructions->push_tail(new(ctx) ir_tracepoint(lhs));
+   }
 
    return new(ctx) ir_dereference_variable(var);
 }
